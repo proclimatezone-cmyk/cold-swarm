@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#05080c">
+<title>Холодный Рой — Станция Гелиос-7</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:#05080c;font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#cfe6ef;touch-action:none}
+canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+#fx{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 45%,rgba(0,0,0,.75) 100%),repeating-linear-gradient(0deg,rgba(255,255,255,.025) 0 1px,transparent 1px 3px)}
+#dmg{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 35%,rgba(170,0,0,.85) 100%);opacity:0;transition:opacity .15s}
+.hud{position:fixed;pointer-events:none;text-shadow:0 0 6px rgba(0,0,0,.9);font-size:14px;letter-spacing:.06em}
+#obj{top:max(14px,env(safe-area-inset-top));left:16px;max-width:60vw}
+#obj b{color:#7fe3ff}
+#hp{bottom:max(18px,env(safe-area-inset-bottom));left:16px;width:200px}
+#hpbar{height:8px;background:rgba(255,255,255,.12);margin-top:4px}
+#hpfill{height:100%;width:100%;background:linear-gradient(90deg,#ff5040,#ffb070)}
+#ammo{bottom:max(18px,env(safe-area-inset-bottom));right:16px;text-align:right;font-size:28px;font-weight:600}
+#ammo small{font-size:12px;display:block;opacity:.7}
+#radar{bottom:max(14px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:130px;height:130px}
+#cross{top:50%;left:50%;width:22px;height:22px;transform:translate(-50%,-50%)}
+#cross:before,#cross:after{content:"";position:absolute;background:rgba(200,240,255,.85)}
+#cross:before{left:10px;top:0;width:2px;height:22px;clip-path:polygon(0 0,100% 0,100% 30%,0 30%,0 70%,100% 70%,100% 100%,0 100%)}
+#cross:after{top:10px;left:0;height:2px;width:22px;clip-path:polygon(0 0,30% 0,30% 100%,0 100%,0 0,70% 0,100% 0,100% 100%,70% 100%,70% 0)}
+#use{top:58%;left:50%;transform:translateX(-50%);text-align:center;display:none}
+#usebar{width:180px;height:6px;background:rgba(255,255,255,.15);margin-top:6px}
+#usefill{height:100%;width:0;background:#6dffb0}
+#toast{top:30%;left:50%;transform:translateX(-50%);font-size:20px;text-align:center;opacity:0;transition:opacity .4s;color:#9fefff}
+.ov{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:rgba(3,6,10,.88);padding:24px;z-index:10}
+.ov h1{font-size:clamp(30px,7vw,64px);letter-spacing:.18em;color:#bff3ff;text-shadow:0 0 24px rgba(80,200,255,.5);font-weight:300}
+.ov h2{font-size:clamp(13px,2.4vw,17px);letter-spacing:.3em;opacity:.65;margin:8px 0 22px;font-weight:400}
+.ov p{max-width:560px;line-height:1.6;opacity:.85;margin:6px 0;font-size:15px}
+.ov .ded{color:#ffd9a0;font-style:italic;margin:14px 0 22px}
+.ov button{pointer-events:auto;margin-top:22px;font-size:20px;letter-spacing:.2em;padding:16px 44px;background:transparent;color:#bff3ff;border:1px solid #5fd0ff;cursor:pointer}
+.ov button:active{background:rgba(95,208,255,.2)}
+.ov .keys{font-size:13px;opacity:.55;margin-top:18px}
+.hidden{display:none!important}
+#touch{position:fixed;inset:0;z-index:5;display:none}
+#joy{position:absolute;left:0;top:0;width:50%;height:100%}
+#joyBase{position:absolute;width:120px;height:120px;border-radius:50%;border:2px solid rgba(160,230,255,.35);display:none;pointer-events:none}
+#joyKnob{position:absolute;width:52px;height:52px;border-radius:50%;background:rgba(160,230,255,.35);left:34px;top:34px}
+.tb{position:absolute;border-radius:50%;border:2px solid rgba(160,230,255,.45);background:rgba(10,30,45,.45);color:#cfefff;font-size:12px;letter-spacing:.08em;display:flex;align-items:center;justify-content:center}
+#bFire{width:92px;height:92px;right:24px;bottom:120px;font-size:14px;border-color:rgba(255,140,110,.6)}
+#bSonar{width:64px;height:64px;right:130px;bottom:150px}
+#bUse{width:64px;height:64px;right:126px;bottom:60px}
+#bReload{width:56px;height:56px;right:40px;bottom:230px}
+</style>
+<script type="importmap">{"imports":{"three":"./three.module.js"}}</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="fx"></div><div id="dmg"></div>
+<div id="hudWrap" class="hidden">
+  <div class="hud" id="obj"></div>
+  <div class="hud" id="hp">ЖИЗНЕОБЕСПЕЧЕНИЕ<div id="hpbar"><div id="hpfill"></div></div></div>
+  <div class="hud" id="ammo"><span id="ammoN">40</span><small>КЛЕПАЛЬНАЯ ВИНТОВКА</small></div>
+  <canvas class="hud" id="radar" width="260" height="260"></canvas>
+  <div class="hud" id="cross"></div>
+  <div class="hud" id="use"><span id="useTxt">ЗАПУСК ГЕНЕРАТОРА</span><div id="usebar"><div id="usefill"></div></div></div>
+  <div class="hud" id="toast"></div>
+</div>
+<div id="touch">
+  <div id="joy"></div>
+  <div id="joyBase"><div id="joyKnob"></div></div>
+  <div class="tb" id="bFire">ОГОНЬ</div>
+  <div class="tb" id="bSonar">СОНАР</div>
+  <div class="tb" id="bUse">ДЕЙСТВ.</div>
+  <div class="tb" id="bReload">ПЕРЕЗ.</div>
+</div>
+<div class="ov" id="menu">
+  <h1>ХОЛОДНЫЙ РОЙ</h1>
+  <h2>СТАНЦИЯ «ГЕЛИОС-7» · ЛЕДЯНАЯ ЛУНА</h2>
+  <p>Связь с шахтёрской станцией потеряна. Вы — спасательная группа. Во тьме коридоров живёт кристаллический Рой: он ползает по стенам и потолку и идёт на шум.</p>
+  <p>Запустите <b>3 генератора</b> и доберитесь до <b>шлюза эвакуации</b>. Сонар показывает врагов — но Рой его тоже слышит.</p>
+  <p class="ded" id="ded"></p>
+  <button id="startBtn">НАЧАТЬ</button>
+  <div class="keys" id="keys"></div>
+</div>
+<div class="ov hidden" id="end"><h1 id="endT"></h1><p id="endP"></p><button id="againBtn">ЕЩЁ РАЗ</button></div>
+<div class="ov hidden" id="pause"><h1>ПАУЗА</h1><button id="resumeBtn">ПРОДОЛЖИТЬ</button></div>
+<script type="module" src="./game.js"></script>
+</body>
+</html>
